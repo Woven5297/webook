@@ -1,10 +1,12 @@
 package web
 
 import (
+	"errors"
 	"fmt"
 	"gitee.com/webook/internal/domain"
 	"gitee.com/webook/internal/service"
 	regexp "github.com/dlclark/regexp2"
+	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"net/http"
 )
@@ -78,14 +80,46 @@ func (u *UserHandler) SignUp(ctx *gin.Context) {
 		Email:    req.Email,
 		Password: req.Password,
 	})
-	if err != nil {
-		ctx.String(http.StatusOK, "service 方法出错")
+	if errors.Is(err, service.ErrUserDuplicateEmail) {
+		ctx.String(http.StatusOK, "邮箱冲突")
+		return
 	}
+	//if err != nil {
+	//	ctx.String(http.StatusOK, "service 方法出错")
+	//}
 	ctx.String(http.StatusOK, "注册成功")
 }
 
 func (u *UserHandler) Login(ctx *gin.Context) {
-
+	type LoginReq struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+	var req LoginReq
+	err := ctx.Bind(&req)
+	if err != nil {
+		return
+	}
+	user, err := u.svc.Login(ctx, domain.User{
+		Email:    req.Email,
+		Password: req.Password,
+	})
+	fmt.Printf("err: %s", err)
+	if errors.Is(err, service.ErrInvalidUserOrPassword) {
+		ctx.String(http.StatusOK, "账号或密码错误")
+		return
+	}
+	if errors.Is(err, service.ErrUserNotFound) {
+		ctx.String(http.StatusOK, "找不到相关账号")
+		return
+	}
+	// 登录成功 设置 session
+	s := sessions.Default(ctx)
+	// 设置值
+	s.Set("userId", user.Id)
+	s.Save()
+	ctx.String(http.StatusOK, "登录成功")
+	return
 }
 
 func (u *UserHandler) Edit(ctx *gin.Context) {

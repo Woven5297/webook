@@ -5,7 +5,10 @@ import (
 	"gitee.com/webook/internal/repository/dao"
 	"gitee.com/webook/internal/service"
 	"gitee.com/webook/internal/web"
+	"gitee.com/webook/internal/web/middleware"
 	"github.com/gin-contrib/cors"
+	"github.com/gin-contrib/sessions"
+	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -35,6 +38,10 @@ func initWebServer() *gin.Engine {
 		//},
 		MaxAge: 12 * time.Hour,
 	}))
+	store := cookie.NewStore([]byte("secret"))
+	server.Use(sessions.Sessions("mysession", store))
+
+	server.Use(middleware.NewLoginMiddlewareBuilder().Build())
 
 	return server
 }
