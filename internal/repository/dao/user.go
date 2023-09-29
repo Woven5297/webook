@@ -22,9 +22,16 @@ func NewUserDAO(db *gorm.DB) *UserDAO {
 		db: db,
 	}
 }
+
 func (dao *UserDAO) FindByEmail(ctx context.Context, email string) (User, error) {
 	var u User
 	err := dao.db.WithContext(ctx).Where("email = ?", email).First(&u).Error
+	return u, err
+}
+
+func (dao *UserDAO) FindById(ctx context.Context, userId int64) (User, error) {
+	var u User
+	err := dao.db.WithContext(ctx).Where("id = ?", userId).First(&u).Error
 	return u, err
 }
 
@@ -48,9 +55,12 @@ func (dao *UserDAO) Insert(ctx context.Context, u User) error {
 
 // User 直接对应数据库表 相当于 entity
 type User struct {
-	Id       int64  `gorm:"primaryKey,autoIncrement"`
-	Email    string `gorm:"unique"`
-	Password string
+	Id          int64  `gorm:"primaryKey,autoIncrement"`
+	Email       string `gorm:"unique"`
+	Password    string
+	NickName    string
+	Age         string
+	Description string
 	// 创建时间 毫秒数
 	CreatedTime int64
 	// 更新时间 毫秒数

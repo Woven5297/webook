@@ -51,3 +51,14 @@ func (svc *UserService) Login(ctx context.Context, u domain.User) (domain.User, 
 	return user, err
 
 }
+
+func (svc *UserService) Profile(ctx context.Context, userId int64) (domain.User, error) {
+	user, err := svc.repo.FindById(ctx, userId)
+	if errors.Is(err, repository.ErrUserNotFound) {
+		return domain.User{}, err
+	}
+	if err != nil {
+		return domain.User{}, err
+	}
+	return user, err
+}

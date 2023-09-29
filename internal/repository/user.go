@@ -26,10 +26,22 @@ func (r *UserRepository) Create(ctx context.Context, u domain.User) error {
 	})
 }
 
-func (r *UserRepository) FindById() {
+func (r *UserRepository) FindById(ctx context.Context, userId int64) (domain.User, error) {
 	// 先从 cache 里找
 	// 再从 dao 里面找
 	// 找到了回写 cache
+	user, err := r.dao.FindById(ctx, userId)
+	if err != nil {
+		return domain.User{}, err
+	}
+	return domain.User{
+		Id:          user.Id,
+		Email:       user.Email,
+		Password:    user.Password,
+		NickName:    user.NickName,
+		Age:         user.Age,
+		Description: user.Description,
+	}, nil
 }
 
 func (r *UserRepository) FindByEmail(ctx context.Context, u domain.User) (domain.User, error) {

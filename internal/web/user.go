@@ -8,6 +8,7 @@ import (
 	regexp "github.com/dlclark/regexp2"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"net/http"
 )
 
@@ -15,6 +16,11 @@ type UserHandler struct {
 	svc         *service.UserService
 	emailExp    *regexp.Regexp
 	passwordExp *regexp.Regexp
+}
+
+type UserClaims struct {
+	jwt.RegisteredClaims
+	Uid int64
 }
 
 func NewUserHandler(svc *service.UserService) *UserHandler {
@@ -90,6 +96,50 @@ func (u *UserHandler) SignUp(ctx *gin.Context) {
 	ctx.String(http.StatusOK, "注册成功")
 }
 
+func (u *UserHandler) LoginJWT(ctx *gin.Context) {
+	type LoginReq struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+	var req LoginReq
+	err := ctx.Bind(&req)
+	if err != nil {
+		return
+	}
+	user, err := u.svc.Login(ctx, domain.User{
+		Email:    req.Email,
+		Password: req.Password,
+	})
+
+	if errors.Is(err, service.ErrInvalidUserOrPassword) {
+		ctx.String(http.StatusOK, "账号或密码错误")
+		return
+	}
+	if errors.Is(err, service.ErrUserNotFound) {
+		ctx.String(http.StatusOK, "找不到相关账号")
+		return
+	}
+	println("user", user)
+	// 用 jwt 设置登录状态
+	// 生成一个 jwt token
+	claims := UserClaims{
+
+		Uid: user.Id,
+	}
+	//token := jwt.New(jwt.SigningMethodHS512)
+	token := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
+	tokenStr, err := token.SignedString([]byte("95osj3fUD7fo0mlYdDbncXz4VD2igvf0"))
+	if err != nil {
+		ctx.String(http.StatusInternalServerError, "token 生成错误")
+		return
+	}
+	ctx.Header("x-jwt-token", tokenStr)
+
+	ctx.String(http.StatusOK, "登录成功")
+	return
+
+}
+
 func (u *UserHandler) Login(ctx *gin.Context) {
 	type LoginReq struct {
 		Email    string `json:"email"`
@@ -104,7 +154,7 @@ func (u *UserHandler) Login(ctx *gin.Context) {
 		Email:    req.Email,
 		Password: req.Password,
 	})
-	fmt.Printf("err: %s", err)
+
 	if errors.Is(err, service.ErrInvalidUserOrPassword) {
 		ctx.String(http.StatusOK, "账号或密码错误")
 		return
@@ -117,9 +167,23 @@ func (u *UserHandler) Login(ctx *gin.Context) {
 	s := sessions.Default(ctx)
 	// 设置值
 	s.Set("userId", user.Id)
+	s.Options(sessions.Options{
+		Secure:   true,
+		HttpOnly: true,
+		MaxAge:   10,
+	})
 	s.Save()
 	ctx.String(http.StatusOK, "登录成功")
 	return
+}
+
+func (u *UserHandler) Logout(ctx *gin.Context) {
+	s := sessions.Default(ctx)
+	s.Options(sessions.Options{
+		MaxAge: -1,
+	})
+	s.Save()
+	ctx.String(http.StatusOK, "退出登录成功")
 }
 
 func (u *UserHandler) Edit(ctx *gin.Context) {
@@ -127,14 +191,31 @@ func (u *UserHandler) Edit(ctx *gin.Context) {
 }
 
 func (u *UserHandler) Profile(ctx *gin.Context) {
+	s := sessions.Default(ctx)
 
+	id := s.Get("userId")
+	if id == nil {
+		ctx.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+	user, err := u.svc.Profile(ctx, id.(int64))
+	if err != nil {
+		ctx.String(http.StatusOK, "找不到相关账号")
+	}
+	ctx.JSON(http.StatusOK, domain.User{
+		Email:       user.Email,
+		NickName:    user.NickName,
+		Age:         user.Age,
+		Description: user.Description,
+	})
 }
 
 func (u *UserHandler) RegisterUserRoutes(server *gin.Engine) {
 
 	ug := server.Group("/users")
 	ug.POST("/signup", u.SignUp)
-	ug.POST("/login", u.Login)
+	//ug.POST("/login", u.Login)
+	ug.POST("/login", u.LoginJWT)
 	ug.POST("/edit", u.Edit)
 	ug.GET("/profile", u.Profile)
 }

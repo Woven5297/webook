@@ -7,8 +7,6 @@ import (
 	"gitee.com/webook/internal/web"
 	"gitee.com/webook/internal/web/middleware"
 	"github.com/gin-contrib/cors"
-	"github.com/gin-contrib/sessions"
-	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -30,19 +28,29 @@ func initWebServer() *gin.Engine {
 	server.Use(cors.New(cors.Config{
 		AllowOrigins: []string{"http://localhost:3000"},
 		//AllowMethods: []string{"POST"},
-		AllowHeaders: []string{"Content-Type", "Authorization"},
-		//ExposeHeaders:    []string{"Content-Type", "Authorization"},
+		AllowHeaders:     []string{"Content-Type", "Authorization"},
+		ExposeHeaders:    []string{"x-jwt-token"},
 		AllowCredentials: true,
 		//AllowOriginFunc: func(origin string) bool {
 		//	return origin == "https://github.com"
 		//},
 		MaxAge: 12 * time.Hour,
 	}))
-	store := cookie.NewStore([]byte("secret"))
-	server.Use(sessions.Sessions("mysession", store))
+	//store := cookie.NewStore([]byte("secret"))
+	//store, err := redis.NewStore(
+	//	16, "tcp",
+	//	"localhost:6379",
+	//	"",
+	//	[]byte("VgMkqI1mTTsfR+yn"),
+	//	[]byte("VgMkqI1mTTsfR+yn"),
+	//)
+	//if err != nil {
+	//	panic(err)
+	//}
+	//server.Use(sessions.Sessions("mysession", store))
 
-	server.Use(middleware.NewLoginMiddlewareBuilder().Build())
-
+	//server.Use(middleware.NewLoginMiddlewareBuilder().Build())
+	server.Use(middleware.NewLoginJWTMiddlewareBuilder().Build())
 	return server
 }
 
